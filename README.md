@@ -9,10 +9,12 @@ An offline Android practice app for the Hong Kong Insurance Intermediaries Quali
 ### 功能
 
 - **分卷学习**：Paper I（保险原理与实务）和 Paper III（长期保险）独立记录学习进度。
-- **全部过一遍**：每天分别设置每卷的新题数量和温习数量，按题库顺序推进，并优先复习已做过的题目。
+- **每日练习**：每天分别设置每卷的新题数量；温习由算法自动编排，按题库顺序推进。
 - **错题回顾**：答错后自动保存于本机，可按试卷集中重新练习。
 - **模拟考试**：每次随机抽取题目，内置倒计时、自动评分和本地成绩记录。
 - **本地优先**：题库、答题记录、每日进度和历史成绩均保存在设备 SQLite 数据库中。没有账号、广告、分析 SDK 或网络权限。
+
+每日进度圈只统计“每日练习”中的新题和计划温习题，模拟考试与独立错题回顾不会计入。用户只设置新题数量；温习由间隔复习算法安排：错题次日优先，连续答对后依次在 1、3、7、14、30 天后复习。
 
 ### 题库
 
@@ -91,10 +93,12 @@ tokens.css                             界面设计令牌
 ### Features
 
 - **Separate papers**: Paper I (Principles and Practice of Insurance) and Paper III (Long Term Insurance) maintain independent study progress.
-- **Complete the bank**: Set a per-paper daily quota for new questions and review questions, then work through the bank in sequence.
+- **Daily practice**: Set a per-paper daily new-question quota; the app schedules reviews automatically while moving through the bank in sequence.
 - **Wrong-answer review**: Incorrect responses are stored locally and can be practised again by paper.
 - **Mock exams**: Each session randomly draws a paper, runs a countdown, scores the attempt, and saves the result locally.
 - **Offline by design**: The question bank, progress, incorrect answers, and results are stored in a device-local SQLite database. There are no accounts, ads, analytics SDKs, or network permissions.
+
+Progress rings count only new and scheduled-review questions completed in Daily Practice; mock exams and standalone error review are excluded. Users set only the new-question quota. Spaced review prioritises incorrect answers on the next day, then schedules correct answers after 1, 3, 7, 14, and 30 days.
 
 ### Question bank
 

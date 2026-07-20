@@ -1,63 +1,35 @@
 package com.iiqe.study;
 
-import android.content.ContentValues;
-import android.content.Context;
+import android.content.*;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteOpenHelper;
+import android.database.sqlite.*;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 final class StudyDb extends SQLiteOpenHelper {
-    StudyDb(Context context) { super(context, "iiqe_study.db", null, 2); }
-
-    @Override public void onCreate(SQLiteDatabase db) {
-        db.execSQL("CREATE TABLE state (paper TEXT NOT NULL, qid INTEGER NOT NULL, seen INTEGER NOT NULL DEFAULT 0, correct INTEGER NOT NULL DEFAULT 0, wrong INTEGER NOT NULL DEFAULT 0, last_seen INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(paper,qid))");
-        db.execSQL("CREATE TABLE settings (paper TEXT PRIMARY KEY, new_count INTEGER NOT NULL, review_count INTEGER NOT NULL, next_index INTEGER NOT NULL)");
-        createAttempts(db);
-    }
-    @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) { if (oldVersion < 2) createAttempts(db); }
-    private void createAttempts(SQLiteDatabase db) { db.execSQL("CREATE TABLE IF NOT EXISTS attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, paper TEXT NOT NULL, mode TEXT NOT NULL, completed INTEGER NOT NULL, total INTEGER NOT NULL, correct INTEGER NOT NULL, seconds INTEGER NOT NULL)"); }
-
-    private void ensurePaper(String paper) {
-        ContentValues values = new ContentValues(); values.put("paper", paper); values.put("new_count", 10); values.put("review_count", 10); values.put("next_index", 0);
-        getWritableDatabase().insertWithOnConflict("settings", null, values, SQLiteDatabase.CONFLICT_IGNORE);
-    }
-    int getNewCount(String paper) { return getSetting(paper, "new_count"); }
-    int getReviewCount(String paper) { return getSetting(paper, "review_count"); }
-    int getNextIndex(String paper) { return getSetting(paper, "next_index"); }
-    private int getSetting(String paper, String key) {
-        ensurePaper(paper); Cursor c = getReadableDatabase().query("settings", new String[]{key}, "paper=?", new String[]{paper}, null, null, null);
-        try { return c.moveToFirst() ? c.getInt(0) : 0; } finally { c.close(); }
-    }
-    void setCount(String paper, String column, int count) { ensurePaper(paper); ContentValues v=new ContentValues(); v.put(column,count); getWritableDatabase().update("settings",v,"paper=?",new String[]{paper}); }
-    void advanceNew(String paper, int index) { ensurePaper(paper); ContentValues v=new ContentValues();v.put("next_index",index);getWritableDatabase().update("settings",v,"paper=?",new String[]{paper}); }
-    void record(String paper, int qid, boolean correct) {
-        SQLiteDatabase db=getWritableDatabase(); ContentValues seed=new ContentValues(); seed.put("paper",paper);seed.put("qid",qid);db.insertWithOnConflict("state",null,seed,SQLiteDatabase.CONFLICT_IGNORE);
-        db.execSQL("UPDATE state SET seen=1, correct=correct+?, wrong=wrong+?, last_seen=? WHERE paper=? AND qid=?",new Object[]{correct?1:0,correct?0:1,System.currentTimeMillis(),paper,qid});
-    }
-    List<Integer> reviewIds(String paper,int limit) { return ids("paper=? AND seen=1 AND last_seen<?",new String[]{paper,String.valueOf(startOfToday())},"wrong DESC, last_seen ASC",limit); }
-    List<Integer> errorIds(String paper,int limit) { return ids("paper=? AND wrong>0",new String[]{paper},"wrong DESC,last_seen ASC",limit); }
-    private List<Integer> ids(String where,String[] args,String order,int limit) { ArrayList<Integer> out=new ArrayList<>();Cursor c=getReadableDatabase().query("state",new String[]{"qid"},where,args,null,null,order,String.valueOf(limit));try{while(c.moveToNext())out.add(c.getInt(0));}finally{c.close();}return out; }
-    int errorCount(String paper) { return scalar("SELECT COUNT(*) FROM state WHERE paper=? AND wrong>0",new String[]{paper}); }
-    int todayCount(String paper) { return scalar("SELECT COUNT(*) FROM state WHERE paper=? AND last_seen>=?",new String[]{paper,String.valueOf(startOfToday())}); }
-    private int scalar(String sql,String[] args) { Cursor c=getReadableDatabase().rawQuery(sql,args);try{return c.moveToFirst()?c.getInt(0):0;}finally{c.close();} }
-    private long startOfToday() { Calendar c=Calendar.getInstance();c.set(Calendar.HOUR_OF_DAY,0);c.set(Calendar.MINUTE,0);c.set(Calendar.SECOND,0);c.set(Calendar.MILLISECOND,0);return c.getTimeInMillis(); }
-
-    void saveAttempt(String paper,String mode,int total,int correct,int seconds) { ContentValues v=new ContentValues();v.put("paper",paper);v.put("mode",mode);v.put("completed",System.currentTimeMillis());v.put("total",total);v.put("correct",correct);v.put("seconds",seconds);getWritableDatabase().insert("attempts",null,v); }
-    Map<Integer,Integer> attemptDays(int year,int month) {
-        HashMap<Integer,Integer> out=new HashMap<>(); Calendar start=Calendar.getInstance();start.set(year,month,1,0,0,0);start.set(Calendar.MILLISECOND,0);Calendar end=(Calendar)start.clone();end.add(Calendar.MONTH,1);
-        Cursor c=getReadableDatabase().rawQuery("SELECT completed FROM attempts WHERE completed>=? AND completed<?",new String[]{String.valueOf(start.getTimeInMillis()),String.valueOf(end.getTimeInMillis())});
-        try { Calendar day=Calendar.getInstance();while(c.moveToNext()){day.setTimeInMillis(c.getLong(0));int d=day.get(Calendar.DAY_OF_MONTH);out.put(d,(out.containsKey(d)?out.get(d):0)+1);}} finally {c.close();} return out;
-    }
-    List<String> attemptsOn(String dayKey) {
-        ArrayList<String> out=new ArrayList<>();SimpleDateFormat fmt=new SimpleDateFormat("yyyy-MM-dd",Locale.US);Cursor c=getReadableDatabase().query("attempts",new String[]{"paper","mode","total","correct","seconds","completed"},null,null,null,null,"completed ASC");
-        try { while(c.moveToNext()){if(fmt.format(new Date(c.getLong(5))).equals(dayKey)){out.add(c.getString(0)+" · "+c.getString(1)+" · "+c.getInt(3)+"/"+c.getInt(2)+" · "+(c.getInt(4)/60)+" 分钟");}}} finally {c.close();}return out;
-    }
+    static final class DailyPlan { final int newGoal,reviewGoal,newDone,reviewDone; DailyPlan(int n,int r,int nd,int rd){newGoal=n;reviewGoal=r;newDone=nd;reviewDone=rd;} int total(){return newGoal+reviewGoal;} int done(){return newDone+reviewDone;} }
+    StudyDb(Context c){super(c,"iiqe_study.db",null,4);}
+    @Override public void onCreate(SQLiteDatabase db){createState(db);createSettings(db);createAttempts(db);createDailyTables(db);}
+    @Override public void onUpgrade(SQLiteDatabase db,int old,int now){if(old<3){db.execSQL("ALTER TABLE state ADD COLUMN streak INTEGER NOT NULL DEFAULT 0");db.execSQL("ALTER TABLE state ADD COLUMN next_review INTEGER NOT NULL DEFAULT 0");}if(old<4)createDailyTables(db);}
+    private void createState(SQLiteDatabase db){db.execSQL("CREATE TABLE state (paper TEXT NOT NULL,qid INTEGER NOT NULL,seen INTEGER NOT NULL DEFAULT 0,correct INTEGER NOT NULL DEFAULT 0,wrong INTEGER NOT NULL DEFAULT 0,last_seen INTEGER NOT NULL DEFAULT 0,streak INTEGER NOT NULL DEFAULT 0,next_review INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(paper,qid))");}
+    private void createSettings(SQLiteDatabase db){db.execSQL("CREATE TABLE settings (paper TEXT PRIMARY KEY,new_count INTEGER NOT NULL,review_count INTEGER NOT NULL,next_index INTEGER NOT NULL)");}
+    private void createAttempts(SQLiteDatabase db){db.execSQL("CREATE TABLE IF NOT EXISTS attempts (id INTEGER PRIMARY KEY AUTOINCREMENT,paper TEXT NOT NULL,mode TEXT NOT NULL,completed INTEGER NOT NULL,total INTEGER NOT NULL,correct INTEGER NOT NULL,seconds INTEGER NOT NULL)");}
+    private void createDailyTables(SQLiteDatabase db){db.execSQL("CREATE TABLE IF NOT EXISTS daily_plan (paper TEXT NOT NULL,day TEXT NOT NULL,new_goal INTEGER NOT NULL,review_goal INTEGER NOT NULL,PRIMARY KEY(paper,day))");db.execSQL("CREATE TABLE IF NOT EXISTS daily_log (paper TEXT NOT NULL,day TEXT NOT NULL,qid INTEGER NOT NULL,kind TEXT NOT NULL,PRIMARY KEY(paper,day,qid))");}
+    private void ensure(String paper){ContentValues v=new ContentValues();v.put("paper",paper);v.put("new_count",10);v.put("review_count",0);v.put("next_index",0);getWritableDatabase().insertWithOnConflict("settings",null,v,SQLiteDatabase.CONFLICT_IGNORE);}
+    int getNewCount(String paper){return setting(paper,"new_count");} int getNextIndex(String p){return setting(p,"next_index");}
+    private int setting(String p,String col){ensure(p);Cursor c=getReadableDatabase().query("settings",new String[]{col},"paper=?",new String[]{p},null,null,null);try{return c.moveToFirst()?c.getInt(0):0;}finally{c.close();}}
+    void setNewCount(String p,int count){ensure(p);ContentValues v=new ContentValues();v.put("new_count",count);getWritableDatabase().update("settings",v,"paper=?",new String[]{p});if(todayDailyCount(p)==0)getWritableDatabase().delete("daily_plan","paper=? AND day=?",new String[]{p,day()});}
+    void advanceNew(String p,int index){ensure(p);ContentValues v=new ContentValues();v.put("next_index",index);getWritableDatabase().update("settings",v,"paper=?",new String[]{p});}
+    DailyPlan plan(String p,int totalQuestions){String d=day();Cursor c=getReadableDatabase().query("daily_plan",new String[]{"new_goal","review_goal"},"paper=? AND day=?",new String[]{p,d},null,null,null);int n,r;if(c.moveToFirst()){n=c.getInt(0);r=c.getInt(1);}else{n=Math.min(getNewCount(p),Math.max(0,totalQuestions-getNextIndex(p)));r=reviewLimit(p,n);ContentValues v=new ContentValues();v.put("paper",p);v.put("day",d);v.put("new_goal",n);v.put("review_goal",r);getWritableDatabase().insert("daily_plan",null,v);}c.close();int nd=scalar("SELECT COUNT(*) FROM daily_log WHERE paper=? AND day=? AND kind='new'",new String[]{p,d});int rd=scalar("SELECT COUNT(*) FROM daily_log WHERE paper=? AND day=? AND kind='review'",new String[]{p,d});return new DailyPlan(n,r,nd,rd);}
+    private int reviewLimit(String p,int newGoal){int due=scalar("SELECT COUNT(*) FROM state WHERE paper=? AND next_review<=?",new String[]{p,String.valueOf(System.currentTimeMillis())});int wrong=scalar("SELECT COUNT(*) FROM state WHERE paper=? AND wrong>correct AND next_review<=?",new String[]{p,String.valueOf(System.currentTimeMillis())});int base=Math.max(8,(int)Math.ceil(newGoal*0.6));int target=Math.max(base,Math.min(wrong,40));return Math.min(60,Math.min(due,target));}
+    List<Integer> reviewIds(String p,int limit){return ids("paper=? AND next_review<=?",new String[]{p,String.valueOf(System.currentTimeMillis())},"CASE WHEN wrong>correct THEN 0 ELSE 1 END,next_review ASC,wrong DESC",limit);}
+    List<Integer> errorIds(String p,int limit){return ids("paper=? AND wrong>0",new String[]{p},"wrong DESC,last_seen ASC",limit);}
+    private List<Integer> ids(String w,String[] a,String o,int l){ArrayList<Integer> out=new ArrayList<>();Cursor c=getReadableDatabase().query("state",new String[]{"qid"},w,a,null,null,o,String.valueOf(l));try{while(c.moveToNext())out.add(c.getInt(0));}finally{c.close();}return out;}
+    void record(String p,int id,boolean correct,boolean daily,boolean isNew){SQLiteDatabase db=getWritableDatabase();ContentValues seed=new ContentValues();seed.put("paper",p);seed.put("qid",id);db.insertWithOnConflict("state",null,seed,SQLiteDatabase.CONFLICT_IGNORE);int old=scalar("SELECT streak FROM state WHERE paper=? AND qid=?",new String[]{p,String.valueOf(id)});int streak=correct?old+1:0;int[] gaps={1,3,7,14,30};int days=correct?gaps[Math.min(streak-1,gaps.length-1)]:1;db.execSQL("UPDATE state SET seen=1,correct=correct+?,wrong=wrong+?,last_seen=?,streak=?,next_review=? WHERE paper=? AND qid=?",new Object[]{correct?1:0,correct?0:1,System.currentTimeMillis(),streak,System.currentTimeMillis()+days*86400000L,p,id});if(daily){ContentValues log=new ContentValues();log.put("paper",p);log.put("day",day());log.put("qid",id);log.put("kind",isNew?"new":"review");db.insertWithOnConflict("daily_log",null,log,SQLiteDatabase.CONFLICT_IGNORE);}}
+    int errorCount(String p){return scalar("SELECT COUNT(*) FROM state WHERE paper=? AND wrong>0",new String[]{p});} int todayDailyCount(String p){return scalar("SELECT COUNT(*) FROM daily_log WHERE paper=? AND day=?",new String[]{p,day()});}
+    private int scalar(String q,String[] a){Cursor c=getReadableDatabase().rawQuery(q,a);try{return c.moveToFirst()?c.getInt(0):0;}finally{c.close();}}
+    private String day(){return new SimpleDateFormat("yyyy-MM-dd",Locale.US).format(new Date());}
+    void saveAttempt(String p,String mode,int total,int correct,int secs){ContentValues v=new ContentValues();v.put("paper",p);v.put("mode",mode);v.put("completed",System.currentTimeMillis());v.put("total",total);v.put("correct",correct);v.put("seconds",secs);getWritableDatabase().insert("attempts",null,v);}
+    Map<Integer,Integer> attemptDays(int y,int m){HashMap<Integer,Integer> out=new HashMap<>();Calendar s=Calendar.getInstance();s.set(y,m,1,0,0,0);s.set(Calendar.MILLISECOND,0);Calendar e=(Calendar)s.clone();e.add(Calendar.MONTH,1);Cursor c=getReadableDatabase().rawQuery("SELECT completed FROM attempts WHERE completed>=? AND completed<?",new String[]{String.valueOf(s.getTimeInMillis()),String.valueOf(e.getTimeInMillis())});try{Calendar d=Calendar.getInstance();while(c.moveToNext()){d.setTimeInMillis(c.getLong(0));out.put(d.get(Calendar.DAY_OF_MONTH),1);}}finally{c.close();}return out;}
+    List<String> attemptsOn(String date){ArrayList<String> out=new ArrayList<>();SimpleDateFormat f=new SimpleDateFormat("yyyy-MM-dd",Locale.US);Cursor c=getReadableDatabase().query("attempts",new String[]{"paper","mode","total","correct","seconds","completed"},null,null,null,null,"completed ASC");try{while(c.moveToNext())if(f.format(new Date(c.getLong(5))).equals(date))out.add(c.getString(0)+" · "+c.getString(1)+" · "+c.getInt(3)+"/"+c.getInt(2)+" · "+(c.getInt(4)/60)+" 分钟");}finally{c.close();}return out;}
 }
