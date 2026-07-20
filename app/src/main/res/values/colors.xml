@@ -1,0 +1,11 @@
+<resources>
+    <color name="coral">#B83B35</color>
+    <color name="ink">#1F2428</color>
+    <color name="muted">#677179</color>
+    <color name="paper">#FFF9F5</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface_tint">#F8EEE8</color>
+    <color name="line">#E5D9D1</color>
+    <color name="success">#2D7256</color>
+    <color name="danger">#A82F3D</color>
+</resources>

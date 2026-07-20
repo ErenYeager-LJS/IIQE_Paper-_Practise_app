@@ -1,0 +1,21 @@
+/* Hallmark | pre-emit critique: P4 H5 E4 S5 R5 V4 */
+/* Hallmark | genre: modern-minimal | macrostructure: Workbench | theme: Coral | enrichment: none | nav: N5 | footer: Ft2 */
+:root {
+  --color-paper: oklch(98% 0.012 55);
+  --color-surface: oklch(100% 0 0);
+  --color-surface-tint: oklch(95% 0.022 45);
+  --color-ink: oklch(26% 0.015 250);
+  --color-muted: oklch(49% 0.018 250);
+  --color-accent: oklch(50% 0.16 28);
+  --color-accent-ink: oklch(100% 0 0);
+  --color-success: oklch(46% 0.10 155);
+  --color-error: oklch(47% 0.16 22);
+  --color-focus: oklch(42% 0.16 255);
+  --font-display: "Geist", sans-serif;
+  --font-body: "Geist", sans-serif;
+  --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px;
+  --text-sm: 14px; --text-base: 16px; --text-lg: 20px; --text-xl: 25px; --text-2xl: 31px;
+  --radius-control: 8px; --radius-card: 12px;
+  --ease-out: cubic-bezier(.2,.8,.2,1); --ease-in: cubic-bezier(.4,0,1,1); --ease-in-out: cubic-bezier(.4,0,.2,1);
+  --dur-fast: 120ms; --dur-base: 180ms; --rule: 1px;
+}

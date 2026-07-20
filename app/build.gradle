@@ -1,0 +1,16 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.iiqe.study'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId 'com.iiqe.study'
+        minSdk 23
+        targetSdk 33
+        versionCode 1
+        versionName '1.0.0'
+    }
+}
